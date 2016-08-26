@@ -21,18 +21,18 @@ var getFromApi = function(endpoint, args) {
 };
 
 var getRelatedFromApi = function(id) {
-    var emitter = new events.EventEmitter();
+    var emitter2 = new events.EventEmitter();
     unirest.get('https://api.spotify.com/v1/artists/' + id + '/related-artists')
            .end(function(response) {
                 if (response.ok) {
-                    emitter.emit('end', response.body);
+                    emitter2.emit('end', response.body);
                 }
                 else {
-                    emitter.emit('error', response.code);
+                    emitter2.emit('error', response.code);
                 }
             });
     console.log("Got second API call");
-    return emitter;
+    return emitter2;
 };
 
 //GET Route
@@ -54,32 +54,43 @@ var getRelatedFromApi = function(id) {
 //     });
 // });
 
+var id;
+
 app.get('/search/:name', function(req, res) {
-    var searchReq = getFromApi('search', {
-        q: req.params.name,
-        limit: 1,
-        type: 'artist'
-    });
+        var searchReq = getFromApi('search', {
+            q: req.params.name,
+            limit: 1,
+            type: 'artist'
+        });
+    
+        //end listener for first call
+        searchReq.on('end', function(item) {
+            var artist = item.artists.items[0];
+            id = item.artists.items[0].id;
+            res.json(artist);
+        });
 
-    searchReq.on('end', function(item) {
-        var artist = item.artists.items[0]; // current artist
-
-        //when the event ends, get the artist ID and name to log
-        var id = item.artists.items[0].id;
-        var name = item.artists.items[0].name;
-        console.log(name + " = " + id);
+        //error listener for first call
+        searchReq.on('error', function(code) {
+             res.sendStatus(code);
+        });
         
-        //make get related artists API call using ID from prior API call
+        //second API call request
         var artists = getRelatedFromApi(id);
         console.log(artists);
 
-        res.json(artist);
+        //end listener for second call
+        artists.on('end', function(item) {
+             var artist = item.artists.items[0];
+             artist.related = item.related;
+             res.json(artist);
+        });
+        
+        //error listener for second call
+        artists.on('error', function(code) {
+             res.sendStatus(code);
+        });
     });
-
-    searchReq.on('error', function(code) {
-        res.sendStatus(code);
-    });
-});
 
 //express http listener
 app.listen(process.env.PORT || 8080);
