@@ -54,31 +54,26 @@ app.get('/search/:name', function(req, res) {
     searchReq.on('end', function(item) {
         artist = item.artists.items[0];
         id = item.artists.items[0].id;
+        
+        
+            var relatedArtist = getRelatedFromApi(id);
+    
+            relatedArtist.on('end', function(item) {
+                artist.related = item.artists;
+   
+                //return when 2nd api call is done
+                res.json(artist);
+            });
+            
+            relatedArtist.on('error', function(code) {
+                res.sendStatus(code);
+            });
     });
     
     searchReq.on('error', function(code) {
         res.sendStatus(code);
     });
     
-    //2nd API call
-    var relatedArtist = getRelatedFromApi(id);
-    console.log(relatedArtist);
-
-    relatedArtist.on('end', function(item) {
-        related = item.artists[0].name;
-        console.log(related);
-
-
-
-        //return when 2nd api call is done
-        res.json(artist);
-
-    });
-    
-    relatedArtist.on('error', function(code) {
-        res.sendStatus(code);
-    });
-
 });
 
 
