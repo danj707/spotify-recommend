@@ -48,7 +48,7 @@ var getTopTracks = function(relID) {
     return emitter;
 };
 
-var id;
+var srch_id;
 var artist;
 var related;
 
@@ -69,11 +69,10 @@ app.get('/search/:name', function(req, res) {
             
         //get the artists and ID for use in next call    
         artist = item.artists.items[0];
-        id = item.artists.items[0].id;
-
+        srch_id = item.artists.items[0].id;
         
             //second API call ///////////////////////////////
-            var relatedArtist = getRelatedFromApi(id);
+            var relatedArtist = getRelatedFromApi(srch_id);
             
             //second .on.end handler
             relatedArtist.on('end', function(item) {
@@ -83,47 +82,25 @@ app.get('/search/:name', function(req, res) {
 
                 //set a counter to know when to stop and output the json 'artist' object
                 var count = 0;
-        
-                //for loop, make multiple API calls to the 'top tracks' endpoint
-                for(var i=0;i<artist.related.length;i++) {
-
-                    //get the id# for the related artists
-                    var relID = item.artists[i].id;
-                    
-                    //console.log("Related artists are: " + item.artists[i].name + " = " + relID);
-
-                    //make a call to the 3rd API
-                    var topTracks = getTopTracks(relID);
-                    
-                    //third .on.end handler
-                    topTracks.on('end', function(reltracks) {
-                        
-                        /////////////////
-                        ////LOGGING ONLY
-                        ////////////////
-                        //special for testing loop to log the result of the api call for each related artist
-                        //for some reason, the api calls are returning in a random order, not as they are called
-                        //check the node.js logs, the artist name != the track band name.  wtf, crazy.
-                        for(var len=0;len<reltracks.tracks.length;len++) {
-                            console.log(artist.related[count].name + ": " + count + " = " + ": " + reltracks.tracks[len].artists[0].name);    
-                        }
-                        //////LOGGING ONLY
-
-                        //set the related tracks to the 
-                        artist.related[count].tracks = reltracks.tracks;
-                        
-                        //increment the counter.  If it's the end of the 'related artists', then output the json object
-                        count++;
-                            if(count == artist.related.length) {
-                                res.json(artist);
-                            }
-                    });
-                }
+                var length = artist.related.length;
                 
-                    topTracks.on('error', function(code) {
+                artist.related.forEach(function(currentArtist) {
+                    var topTracks = getTopTracks(currentArtist.id);
+                    
+                    topTracks.on('end',function(item) {
+                        currentArtist.tracks = item.tracks;
+                        console.log(count);
+                        count++;
+                        if(count === length) {
+                            
+                           res.json(artist);
+                        }
+    
+                    });
+                    topTracks.on('error',function(code) {
                         res.sendStatus(code);
                     });
-             
+                });
             });
             
             relatedArtist.on('error', function(code) {
