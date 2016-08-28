@@ -3,8 +3,8 @@ var express = require('express');
 var events = require('events');
 var app = express();
 app.use(express.static('public'));
-var waterfall = require('async-waterfall');
 
+//first API call to get the artist ID by name search
 var getFromApi = function(endpoint, args) {
     var emitter = new events.EventEmitter();
     unirest.get('https://api.spotify.com/v1/' + endpoint)
@@ -20,6 +20,7 @@ var getFromApi = function(endpoint, args) {
     return emitter;
 };
 
+//second API call to get the list of related artists
 var getRelatedFromApi = function(id) {
     var emitter = new events.EventEmitter();
     unirest.get('https://api.spotify.com/v1/artists/' + id + '/related-artists')
@@ -34,6 +35,7 @@ var getRelatedFromApi = function(id) {
     return emitter;
 };
 
+//third API call to get the list of top tracks for each related artist
 var getTopTracks = function(relID) {
     var emitter = new events.EventEmitter();
     unirest.get('https://api.spotify.com/v1/artists/' + relID + '/top-tracks?country=us')
@@ -48,12 +50,12 @@ var getTopTracks = function(relID) {
     return emitter;
 };
 
+//globals for setting related artist id and artist
 var srch_id;
 var artist;
-var related;
 
-//GET Route
-var app = express();
+
+//GET Route - search by name
 app.use(express.static('public'));
 
 app.get('/search/:name', function(req, res) {
@@ -80,35 +82,41 @@ app.get('/search/:name', function(req, res) {
                 //set the related artists to make the html work
                 artist.related = item.artists;
 
-                //set a counter to know when to stop and output the json 'artist' object
+                //set a counter and array length to know when to stop and output the json 'artist' object
                 var count = 0;
                 var length = artist.related.length;
                 
+                //iterate through each item in the array, making an API call for each related artist, getting the top tracks
                 artist.related.forEach(function(currentArtist) {
                     var topTracks = getTopTracks(currentArtist.id);
                     
+                    //third .on.end handler
                     topTracks.on('end',function(item) {
+                        //setting the current artist tracks to the related artist tracks, displays in the html
                         currentArtist.tracks = item.tracks;
-                        console.log(count);
+
+                        //counter to check if the length has equalled the total array length, if so, then break and output the json object
                         count++;
                         if(count === length) {
-                            
                            res.json(artist);
                         }
-    
                     });
+                    
+                    //error handling
                     topTracks.on('error',function(code) {
                         res.sendStatus(code);
                     });
                 });
             });
             
+            //error handling
             relatedArtist.on('error', function(code) {
                 res.sendStatus(code);
             });
    
     });
     
+    //error handling
     searchReq.on('error', function(code) {
         res.sendStatus(code);
     });
